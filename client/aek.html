@@ -1,0 +1,520 @@
+{% extends "master.html" %}
+{% block init %}{{ aek.set_aek_version(1.3) }}{% endblock %}
+{% block title %}Sussex email{% endblock %}
+{% block main_content %}
+{{ aek.add_lib("aek-core") }}
+{{ aek.remove_from_cache }}
+<style type="text/css" media="all">
+  body, html { background: #fff; }
+  div#mailmain { width: 90%; padding: 5%; text-align:left; margin: 0 auto; padding-top: 10px;}
+  div.main-content { background: #fff; text-align: center; padding-top: 0px;}
+  .navbar { display:none; }
+  .footer { border:none; }
+  div.bodyblock { background: #fff; box-shadow: none; }
+  div.message_header { padding: 0px; border-bottom: 1px solid #ddd; }
+  div.message_body { padding-top: 14px; padding-bottom: 10px; width: 100%; overflow:hidden;}
+  div.inner {  }
+  div.message_header h2 { margin-bottom: 2px; }
+  div.message_header h3 { margin-bottom: 2px; font-weight: normal; }
+  div.message_header h4 { font-weight: normal; color: #999; font-size: 80%; }
+  div.attachments { padding-top: 10px; }
+  li { color: #666; background: #fff;}
+  ul.listview li { border-top: 1px solid #eee; cursor: pointer; font-weight:normal; padding: 10px; }
+  ul.listview li div { font-size: 15px; }
+  ul.listview li:first-child { border-top: 0px; }
+  ul, li, div, ul.listview, ul.listview li { box-shadow: none; }
+  li.is-active:hover { background: #efefef; }
+  ul.listview div.msgSubject { font-size:110%; color: #000; padding-bottom:2px;  }
+  span.seen { font-weight: normal; }
+  span.unseen { font-weight: bold; }
+  span.listdate { color: #999; white-space:no-wrap; padding-left:3px; }
+  div.stats { padding: 10px; padding-bottom: 40px; }
+  span.statAll, span.statUns { font-size: 150%; font-weight: bold; color: #aacc22; }
+  span.statAll { color: #aaaaaa; }
+  span.statDesc { font-size: 80%; }
+  div.stat { display: inline-block; width: 40%; }
+  div#messagepanel { padding:0px; display:none; }
+  div#debug { }
+  button, button#sendMail, button#close { width: 20%; display: inline; outline: none; border: none; background: #fff; box-shadow: none; border-radius: 0px; margin:0px;}
+  button:hover, button#close:hover { background: #fff; }
+  div#controls { text-align: center; background: #019376; padding-bottom:12px;}
+  div#controls button { width: 20%; display: inline; outline: none; border: none; background: transparent; box-shadow: none; border-radius: 0px; margin:0px; color: #fff;}
+  div#controls button:hover, div#controls button:active { background: transparent; }
+  div.more-messages { text-align: center; }
+  button#more { outline: none; border:none; background: #fff; box-shadow:none; border-radius: 0px; width: 80%; }
+  div#fetching { display: none; text-align: center;}
+  div#compose { display: none; }
+  div.formElement { margin-bottom: 10px; }
+  div.formElement input, div.formElement textarea { border-radius: 0px; padding: 10px; border: none; border-bottom: 1px solid #eee; background: #fff; margin-top:5px; outline: none; }
+  div.formElement textarea { background: #fafafa; resize:none; height: 200px; }
+  label { font-weight: bold; padding-top: 15px; }
+  button#close { text-align:left; padding-left: 0px; }
+  button#sendMail { background: #aacc22; color: #fff; border-radius: 3px; }
+  form#webmaillogin { text-align: center; }
+  button#webmailbutton { background: #aacc22; color: #061; border-radius: 3px; box-shadow:none; border: 0px; width: 200px; }
+  button#refresh img { height: 20px; width: 20px; }
+  button#new img { height: 20px; width: 20px; }
+  button#cancel img { height: 20px; width: 20px; }
+  button.older img { height: 20px; width: 20px; }
+  button.newer img { height: 20px; width: 20px; }
+  button.backtolist img { height: 20px; width: 20px; }
+  button.reply img { height: 20px; width: 20px; }
+  div.sendResult { padding: 10px; display: none; }
+  .hideTo, .hideCc, .hideSubject, .hideBody { display: none; }
+  textarea::-webkit-scrollbar, textarea::-webkit-scrollbar-track { width:1px; background-color:transparent; }
+  span.attachmentbullet { color: #666; }
+  p.footer { padding-top: 30px; font-size: 90%; font-style: italic; }
+</style>
+<!-- panel for control buttons -->
+<div id="controls" class="bodyblock flush"></div>
+<div class="bodyblock flush">
+<div id="mailmain">
+<!-- the address where the server page is stored -->
+{% set webservice_url = "https://wwwnewdev.sussex.ac.uk/its/sussexmobile/mail3/server/mail" %}
+
+<!-- when the page loads, get a login token that we can use
+  for web service requests -->
+{% set token = aek.get_service("MAIL3") %}
+
+<!-- add on the suffix needed for Office 365 accounts -->
+{% set usr = token.user_credentials.username %}
+{{ token.set_parameter("username",usr~'@sussex.ac.uk') }}
+
+<!-- panel for reading messages -->
+<div id="messagepanel"></div>
+<!-- panel for displaying message list -->
+<div id="messagestats"></div>
+<div id="messagelist"></div>
+<!-- panel for composing or replying -->
+<div id="sendResult"></div>
+<div id="compose">
+  <h1>Send an email</h1>
+  <form id="msgForm">
+    <div class="formElement"><label for="formTo">To </label><input type="text" name="to" id="formTo" /></div>
+    <div class="formElement"><label for="formCc">Cc </label><input type="text" name="cc" id="formCc" /></div>
+    <!--<div class="formElement">bc <input type="text" name="bcc" id="formBcc" /></div>-->
+    <div class="formElement"><label for="formSubject">Subject </label><input type="text" name="subject" id="formSubject" /></div>
+    <div class="formElement"><label for="formBody">Message</label><br/>
+    <textarea name="body" id="formBody"></textarea></div>
+    <button id="sendMail">send</button>
+  </form>
+  <div style="height: 200px"><!-- spacer so form can scroll up to avoid keyboard --></div>
+</div>
+<!-- panel for showing debugging information -->
+<div id="debug"></div>
+</div>
+</div>
+<script type="text/javascript" data-defer="true" charset="utf-8">
+
+    //use a token to avoid problems with encoding on some password characters
+    var token = "{{ token.json.loginToken }}";
+    var url = "{{ webservice_url }}";
+    var page = 1;
+    var platform = "{{ aek.get_platform }}";
+    var msgTotal = 0;
+    var unsTotal = 0;
+    var inboxTotal = 0;
+    var origin = '';
+
+    function debug(string) {
+        //$("#debug").append(string+"<br/>");
+    }
+  
+    function get(postfields, cback) {
+      
+      var xhr = new XMLHttpRequest();
+      xhr.onload = function() {
+        cback(xhr.responseText);
+      }
+      xhr.open('POST', url, true);
+      xhr.setRequestHeader("Content-type","application/x-www-form-urlencoded; charset=utf-8");
+      xhr.send(postfields);
+      
+    }
+  
+    function getData() {
+ 
+      var postfields = "token="+token+"&action=data";
+      get( postfields , prepData );
+      
+    }
+  
+    function prepData(json) {
+ 
+      var inboxData = JSON.parse(json);
+      unsTotal = inboxData.unseen;
+      msgTotal = inboxData.all;
+      inboxTotal = parseInt(msgTotal.split(",").join(""));
+      origin = inboxData.ip;
+      updateData();
+      
+    }
+  
+    function updateData() {
+ 
+      var dataPanel = '<div class="flush stats"><h1>Inbox</h1><div class="stat"><span class="statUns">'+unsTotal+'</span><br /><span class="statDesc">UNSEEN</span></div><div class="stat"><span class="statAll">'+msgTotal+'</span><br /><span class="statDesc">TOTAL</span></div></div>';
+      $('#messagestats').html(dataPanel);
+      
+    }
+  
+    function formMessageList() {
+      
+      $("#messagelist").val('');
+      messagedb = [];
+      var msglist = '<ul class="listview flush" id="msglist">';
+      msglist += '</ul>';
+      var morebutton = '<div class="more-messages"><div id="fetching">loading...</div><button id="more">load more</button></div>';
+      
+      $("#messagepanel").val("");
+      $("#messagepanel").hide();
+      $("#messagelist").val("");
+      $("#messagelist").html(msglist);
+      $("#messagelist").append(morebutton);
+      
+      var controls = '';
+      $("#controls").val("");
+      $("#controls").html(controls);
+      $("#messagestats").show();
+      $("#messagelist").show();
+      $("#more").click(function() {
+          getMessageList(page);
+      });
+      getMessageList(page);
+      
+    }
+  
+    function getMessageList(pg) {
+      
+      $("#more").hide();
+      $("#fetching").show();
+      var postfields = "action=inbox&token="+token+"&p="+pg;
+      get( postfields , printMessageList );
+      
+    }
+  
+    function refreshList() {
+      
+      page = 1;
+      getData();
+      formMessageList(page);
+      
+    }
+  
+    function printMessageList(json) {
+ 
+      var msgs = JSON.parse(json);
+      var msglist = '';
+      var endoflist = false;
+      for(var m in msgs) {
+        var msg = msgs[m];
+        messagedb[msg.uid] = [msg.id, msg.changekey];
+        if(msg.isread==false) {
+            var seen = "unseen";
+        } else {
+            var seen = "seen";
+        }
+        var from = msg.from.name;
+        if(msg.attachments) {
+            var attach = '<span class="attachmentbullet">&#10033;</span>';
+        } else {
+            var attach = "";
+        }
+        if(from != null) {
+          msglist += '<li class="msg" id="'+msg.uid+'"><div class="msgSubject"><span class="'+seen+'">'+msg.subject+'</span></div><div>'+from+'<span class="listdate">&nbsp;&#149;&nbsp;'+msg.date+'</span> '+attach+'</div></li>';
+        } else {
+          endoflist = true; 
+        }
+      }
+      if(msglist=='') {
+        if(endoflist) {
+          msglist = '<li>No more messages found</li>';
+        } else {
+          msglist = '<li><a href="">No messages? Tap here to reload</a></li>';
+        }
+      }
+      showListControls();
+      $("#msglist").append(msglist);
+      $(".msg").click(function() {
+          var uid = $(this).attr('id');
+          getMessage(uid);
+      });
+      page++;
+      if(!endoflist) {
+        $("#more").show();
+      }
+      $("#fetching").hide();
+      $("#webmailbutton").click(function() {
+        $("#webmaillogin").submit();
+      });
+      
+    }
+  
+    function showMessageList() {
+    
+      $("#messagepanel").text('');
+      $("#messagepanel").hide();
+      $("#messagestats").show();
+      $("#messagelist").show();
+      $("#footer").show();
+      showListControls();
+      
+    }
+  
+    function showListControls() {
+      
+      $("#controls").html('<button id="refresh"><img src="https://portal.ombiel.co.uk/assets/UniversityofSussex/UoSStudents/mail/refresh.png" alt="refresh" /></button><button id="new"><img src="https://portal.ombiel.co.uk/assets/UniversityofSussex/UoSStudents/mail/new.png" alt="new" /></button>');
+      $("#refresh").click(function() {
+          refreshList();
+      });
+      $("#new").click(function() {
+          newMessage();
+      });
+      
+    }
+  
+    function showComposeControls() {
+      
+      $("#controls").html('<button id="cancel"><img src="https://portal.ombiel.co.uk/assets/UniversityofSussex/UoSStudents/mail/cancel.png" alt="cancel" /></button>');
+      $("#cancel").click(function() {
+          $("#compose").hide();
+          showMessageList();
+      });
+      
+    }
+  
+    function getMessage(uid) {
+    
+      $("#messagepanel").html('loading...');
+      $("#messagelist").hide();
+      $("#messagepanel").show();
+      $("#footer").hide();
+      $("#messagestats").hide();
+      $("#controls").text('');
+      var messageids = messagedb[uid];
+      //var postfields = "token="+token+"&action=read&id="+messageids[0]+"&changekey="+messageids[1];
+      var postfields = "token="+token+"&action=read&uid="+uid;
+      get(postfields, printMessage);
+      debug("getting "+uid);
+      
+    }
+  
+    function escapeRegExp(str) {
+      return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+    }
+  
+    function printMessage(json) {
+      
+      var msg = JSON.parse(json);
+      $("#messagepanel").text('Got it...');
+      debug("got "+msg.uid);
+      if(msg.from.name=="") {
+        var from = msg.from.address;
+      } else {
+        var from = msg.from.name;
+      }
+      var msgHTML = '<div class="message_header"><div class="inner"><h2>'+msg.subject+'</h2><h3>'+from+'</h3><h4>'+msg.date+'</h4></div></div>';
+      var bodytext = '';
+      if(msg.bodytext != null) {
+        bodytext = msg.bodytext;
+        bodytext = bodytext.replace(new RegExp('>', 'g'), '&gt;');
+        bodytext = bodytext.replace(new RegExp('<', 'g'), '&lt;');
+        bodytext = bodytext.replace(new RegExp('\r\n', 'g'), '<br />');
+        bodytext = bodytext.replace(new RegExp('\n', 'g'), '<br />');
+      }
+      
+      //replace links
+      if(msg.links) {
+        var links = msg.links;
+        for(var l in links) {
+          var link = links[l];
+          var templink = link.split('http').join('---templink---');
+          var linktext = '<a href="' + templink + '">' + templink + '</a>';
+          bodytext = bodytext.split(link).join(linktext);
+        }
+        bodytext = bodytext.split('---templink---').join('http');
+      }
+      
+      //replace emails
+      if(msg.emails) {
+        var addresses = msg.emails;
+        for(var a in addresses) {
+          var address = addresses[a];
+          var addtext = '<a class="mailto" href="">' + address + '</a>';
+          bodytext = bodytext.split(address).join(addtext);
+        }
+      }
+      
+      msgHTML += '<div class="message_body"><div class="inner">'+bodytext+'</div></div>';
+      
+      //details of attachments
+      if(msg.attachments.length > 0) {
+          msgHTML += '<div class="attachments"><h3>Attachments</h3>';
+          var attachments = msg.attachments;
+          for(var a in attachments) {
+              var attachment = attachments[a];
+              var href = linkAttachment(msg.uid, attachment.seq);
+              //if(platform != "android") {
+                msgHTML += '<p><span class="attachmentbullet">&#10033;</span> <a href="'+href+'">'+attachment.filename+'</a></p>';
+              //} else {
+                //msgHTML += '<p><span class="attachmentbullet">&#10033;</span> '+attachment.filename+'</p>';
+              //}
+          }
+          if(platform == "android") {
+            msgHTML += '<p>Sorry, you can\'t download attachments using the Android app - <a href="http://sussex.ac.uk/its/help/faq2676">why not?</a></p>';
+          }
+          msgHTML += '</div>';
+      }
+      
+      //hidden variables for replying or forwarding
+      var hideTo = msg.recipients.gobackto;
+      var hideCc = msg.recipients.cc;
+      var hideSubject = msg.subject;
+      var hideBody = '\r\n\r\n-----Original message-----\r\nFrom: '+from+'\r\nTo: '+msg.recipients.to;
+      if(msg.recipients.cc) {
+          hideBody += '\r\nCc: '+msg.recipients.cc;
+      }
+      hideBody += '\r\nSubject: '+msg.subject+'\r\n\r\n'+msg.bodytext;
+      //msgHTML += '<div class="hideTo">'+hideTo+'</div><div class="hideCc">'+hideCc+'</div><div class="hideSubject">'+hideSubject+'</div><div class="hideBody">'+hideBody+'</div>';
+      
+      // control bar
+      var controls = '';
+      controls += '<button class="backtolist"><img src="https://portal.ombiel.co.uk/assets/UniversityofSussex/UoSStudents/mail/menu.png" alt="back to list" /></button>';
+      if(msg.uid < inboxTotal) {
+        controls += '<button class="older"><img src="https://portal.ombiel.co.uk/assets/UniversityofSussex/UoSStudents/mail/l_arrow.png" alt="previous message" /></button>';
+      } else {
+        controls += '<button class="inactive"> </button>';
+      }
+      if(msg.uid > 0) {
+        controls += '<button class="newer"><img src="https://portal.ombiel.co.uk/assets/UniversityofSussex/UoSStudents/mail/r_arrow.png" alt="next message" /></button>';
+      } else {
+        controls += '<button class="inactive"> </button>';
+      }
+      controls += '<button class="reply"><img src="https://portal.ombiel.co.uk/assets/UniversityofSussex/UoSStudents/mail/reply.png" alt="reply" /></button>';
+      
+      // mark message as seen
+      var msgDiv = "#"+msg.uid;
+      $(msgDiv).children("div.msgSubject").children("span.unseen").toggleClass("unseen","seen");
+      if(msg.markedAsSeen) {
+          if(unsTotal>0) {
+              unsTotal--;
+              updateData();
+          }
+      }
+      
+      $("#messagepanel").html(msgHTML);
+      $("#messagepanel").show();
+      window.scrollTo(0,0);
+      $("#controls").html(controls);
+      $(".older").click(function() {
+          getMessage(msg.uid+1);
+      });
+      $(".backtolist").click(function() {
+          showMessageList();
+      });
+      $(".newer").click(function() {
+          getMessage(msg.uid-1);
+      });
+      $(".reply").click(function() {
+          hideSubject = "Re: " + hideSubject;
+          newMessage(hideTo, hideCc, hideSubject, hideBody);
+      });
+      $(".mailto").click(function(e) {
+          e.preventDefault();
+          var toaddr = $(this).text();
+          newMessage(toaddr);
+      });
+    }
+  
+    function newMessage(to, cc, subject, body) {
+        showComposeControls();
+        $("#msgForm").data('submitted', false);
+        $("#messagelist").hide();
+        $("#footer").hide();
+        $("#messagestats").hide();
+        $("#messagepanel").hide();
+        $("#compose").show();
+        if(to) {
+          $("#formTo").val(to);
+        } else {
+          $("#formTo").val('');
+        }
+        if(cc) {
+          $("#formCc").val(cc);
+        } else {
+          $("#formCc").val('');
+        }
+        $("#formBcc").val('');
+        if(subject) {
+          $("#formSubject").val(subject);
+        } else {
+          $("#formSubject").val('');
+        }
+        if(body) {
+          $("#formBody").val(body);
+        } else {
+          $("#formBody").val('');
+        }
+        window.scrollTo(0,0);
+        $("#sendResult").text('');
+        $("#sendMail").click(function(e){
+            e.preventDefault();
+            if ($("#msgForm").data('submitted') === true) {
+              e.preventDefault();
+            } else {
+               $("#msgForm").data('submitted', true);
+               sendMessage();
+            }
+        });
+    }
+  
+    function sendMessage() {
+        var sendTo = $("#formTo").val();
+        var sendCc = $("#formCc").val();
+        var sendBcc = $("#formBcc").val();
+        var sendSubject = $("#formSubject").val();
+        var sendBody = $("#formBody").val();
+        sendBody = sendBody.split("&").join("----ampersand----");
+        var postfields = "action=send&token="+token;
+        postfields += "&to="+ encodeURI(sendTo);
+        postfields += "&cc=" + encodeURI(sendCc);
+        postfields += "&bcc=";
+        postfields += "&subject=" + encodeURI(sendSubject);
+        postfields += "&body=" + encodeURI(sendBody);
+        
+        get(postfields, messageSent);
+    }
+  
+    function messageSent(json) {
+      
+      var msg = JSON.parse(json);
+      $("#sendResult").html('<p>'+msg.outcome+'</p><button id="close">OK</button>');
+      $("#sendResult").show();
+      $("#compose").hide();
+      $("#close").click(function() {
+          sendDone();
+        });
+      
+    }
+  
+    function sendDone() {
+     
+      $("#sendResult").hide();
+      showMessageList();
+      
+    }
+  
+    function linkAttachment(uid, seq) {
+        //campusm://openURL?url=XX&type=external
+  	var fileloc = url + '?action=download&token=' + token + '&uid=' + uid + '&seq=' + seq;
+  	return fileloc;
+  
+    }
+  
+    $(document).ready(function() {
+      //get the first page of email by default
+      getData();
+      formMessageList(page);
+    });
+    
+</script>
+{% endblock %}
