@@ -134,7 +134,7 @@ class Exchangeclient {
 		
 		$this->teardown();
 
-		$output = [];
+		$output = array();
 		$counter = $offset;
 		foreach($messages as $message) {
 			$stamp = date("j M H:i", strtotime($message->DateTimeReceived));
@@ -195,7 +195,7 @@ class Exchangeclient {
 			//reorganise recipients
 			$to = $message->ToRecipients->Mailbox;
 			$torecipients = [$frommail];
-			$sentto = [];
+			$sentto = array();
 			if(!is_array($to)) { $to = [$to]; }
 			foreach($to as $toperson) {
 				$tomail = $toperson->EmailAddress;
