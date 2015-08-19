@@ -207,7 +207,7 @@ class Exchangeclient {
 			
 			$cc = $message->CcRecipients->Mailbox;
 			$ccrecipients = array();
-			if(!is_array($cc)) { $cc = [$cc]; }
+			if(!is_array($cc)) { $cc = array($cc); }
 			foreach($cc as $ccperson) {
 				$ccrecipients[] = $ccperson->EmailAddress;
 			}
