@@ -190,13 +190,13 @@ class Exchangeclient {
 			$output = array(); 
 			$output["subject"] = $message->Subject;
 			$frommail = $message->From->Mailbox->EmailAddress;
-			$output["from"] = ["name"=>$message->From->Mailbox->Name, "address"=>$frommail];
+			$output["from"] = array("name"=>$message->From->Mailbox->Name, "address"=>$frommail);
 			
 			//reorganise recipients
 			$to = $message->ToRecipients->Mailbox;
-			$torecipients = [$frommail];
+			$torecipients = array($frommail);
 			$sentto = array();
-			if(!is_array($to)) { $to = [$to]; }
+			if(!is_array($to)) { $to = array($to); }
 			foreach($to as $toperson) {
 				$tomail = $toperson->EmailAddress;
 				$sentto[] = $tomail;
@@ -361,7 +361,7 @@ class Exchangeclient {
 			$message = $response->ResponseMessages->GetItemResponseMessage->Items->Message;
 			if(isset($message->Attachments)) {
 				$files = $message->Attachments->FileAttachment;
-				$files = !is_array($files) ? [$files] : $files;
+				$files = !is_array($files) ? array($files) : $files;
 				$seq = 0;
 				foreach($files as $file) {
 					if(intval($file->Size) > 0) {
