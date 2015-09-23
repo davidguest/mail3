@@ -112,11 +112,15 @@ if(isset($_REQUEST["token"]) || (isset($_REQUEST["username"]) && isset($_REQUEST
 			
 		} elseif(isset($_REQUEST["id"]) && isset($_REQUEST["changekey"])) {
 		
-			$uid = str_replace(" ", "+", urldecode($_REQUEST["id"]));
-			$uid = str_replace(" ", "+", urldecode($_REQUEST["changekey"]));
+			$id = str_replace(" ", "+", urldecode($_REQUEST["id"]));
+			$changekey = str_replace(" ", "+", urldecode($_REQUEST["changekey"]));
 			
-			//$seen = @$mail->mark_as_read($id, $changekey);
 			$msg = @$mail->get_message($id);
+			$isread = $msg["isread"];
+			if($isread==0) {
+				$seen = @$mail->mark_as_read($id, $changekey);
+				$msg["markedAsSeen"] = true;
+			}
 			$msg["mailboxtotal"] = number_format($count->TotalCount);
 			
 			header('Content-Type: text/plain; charset=UTF-8');
