@@ -115,6 +115,7 @@
     var unsTotal = 0;
     var inboxTotal = 0;
     var origin = '';
+    var currentMessage = 0;
 
     function debug(string) {
         //$("#debug").append(string+"<br/>");
@@ -284,15 +285,17 @@
   
     function getMessage(uid) {
     
+      currentMessage = parseInt(uid);
       $("#messagepanel").html('loading...');
       $("#messagelist").hide();
       $("#messagepanel").show();
       $("#footer").hide();
       $("#messagestats").hide();
-      $("#controls").text('');
+      var controls = '';
+      controls += '<button class="backtolist"><img src="https://portal.ombiel.co.uk/assets/UniversityofSussex/UoSStudents/mail/menu.png" alt="back to list" /></button>';
+      $("#controls").html(controls);
       var messageids = messagedb[uid];
-      //var postfields = "token="+token+"&action=read&id="+messageids[0]+"&changekey="+messageids[1];
-      var postfields = "token="+token+"&action=read&uid="+uid;
+      var postfields = "token="+token+"&action=read&id="+encodeURIComponent(messageids[0])+"&changekey="+encodeURIComponent(messageids[1]);
       get(postfields, printMessage);
       debug("getting "+uid);
       
@@ -306,7 +309,7 @@
       
       var msg = JSON.parse(json);
       $("#messagepanel").text('Got it...');
-      debug("got "+msg.uid);
+      debug("got "+currentMessage);
       if(msg.from.name=="") {
         var from = msg.from.address;
       } else {
@@ -379,12 +382,12 @@
       // control bar
       var controls = '';
       controls += '<button class="backtolist"><img src="https://portal.ombiel.co.uk/assets/UniversityofSussex/UoSStudents/mail/menu.png" alt="back to list" /></button>';
-      if(msg.uid < inboxTotal) {
+      if(currentMessage < inboxTotal) {
         controls += '<button class="older"><img src="https://portal.ombiel.co.uk/assets/UniversityofSussex/UoSStudents/mail/l_arrow.png" alt="previous message" /></button>';
       } else {
         controls += '<button class="inactive"> </button>';
       }
-      if(msg.uid > 0) {
+      if(currentMessage > 0) {
         controls += '<button class="newer"><img src="https://portal.ombiel.co.uk/assets/UniversityofSussex/UoSStudents/mail/r_arrow.png" alt="next message" /></button>';
       } else {
         controls += '<button class="inactive"> </button>';
@@ -392,7 +395,7 @@
       controls += '<button class="reply"><img src="https://portal.ombiel.co.uk/assets/UniversityofSussex/UoSStudents/mail/reply.png" alt="reply" /></button>';
       
       // mark message as seen
-      var msgDiv = "#"+msg.uid;
+      var msgDiv = "#"+currentMessage;
       $(msgDiv).children("div.msgSubject").children("span.unseen").toggleClass("unseen","seen");
       if(msg.markedAsSeen) {
           if(unsTotal>0) {
@@ -406,13 +409,13 @@
       window.scrollTo(0,0);
       $("#controls").html(controls);
       $(".older").click(function() {
-          getMessage(msg.uid+1);
+          getMessage(currentMessage+1);
       });
       $(".backtolist").click(function() {
           showMessageList();
       });
       $(".newer").click(function() {
-          getMessage(msg.uid-1);
+          getMessage(currentMessage-1);
       });
       $(".reply").click(function() {
           hideSubject = "Re: " + hideSubject;
