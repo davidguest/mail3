@@ -217,6 +217,9 @@ class Exchangeclient {
 			$timestmp = strtotime($message->DateTimeSent);
 			$output["date"] = date("j M H:i", $timestmp);
 			
+			//has the message been read yet
+			$output["isread"] = $message->IsRead;
+			
 			//message body
 			$rawbody = $message->Body->_;
 			
