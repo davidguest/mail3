@@ -126,31 +126,56 @@ class Exchangeclient {
 		$FindItem->IndexedPageItemView->MaxEntriesReturned = $count;
 		$response = $this->client->FindItem($FindItem);
 		
-		$messages = $response->ResponseMessages->FindItemResponseMessage->RootFolder->Items->Message;
-		
-		if(!is_array($messages)) {
-			$messages = array($messages);
+		$itemtypes = array();
+		$items = $response->ResponseMessages->FindItemResponseMessage->RootFolder->Items;
+		foreach($items as $itemtype) {
+			$itemtypes[] = $itemtype;
 		}
 		
 		$this->teardown();
 
 		$output = array();
-		$counter = $offset;
-		foreach($messages as $message) {
-			$stamp = date("j M H:i", strtotime($message->DateTimeReceived));
-			$attachmentcount = intval($message->HasAttachments);
-			$from = array("name"=>$message->Sender->Mailbox->Name);
-			$output[] = array(
-								"uid"=>$counter,
-								"subject"=>$message->Subject, 
-								"from"=>$from,
-								"attachments"=>$attachmentcount,
-								"date"=>$stamp,
-								"id"=>$message->ItemId->Id,
-								"changekey"=>$message->ItemId->ChangeKey,
-								"isread"=>$message->IsRead
-							);
-			$counter++;
+		foreach($itemtypes as $messages) {
+			if(!is_array($messages)) {
+				$messages = array($messages);
+			}
+			foreach($messages as $message) {
+				$unixtime = strtotime(@$message->DateTimeReceived);
+				$stamp = date("j M H:i", $unixtime);
+				$attachmentcount = intval(@$message->HasAttachments);
+				$from = array("name"=>@$message->Sender->Mailbox->Name);
+				$newitem = array(
+									"subject"=>@$message->Subject, 
+									"from"=>@$from,
+									"attachments"=>@$attachmentcount,
+									"date"=>@$stamp,
+									"id"=>@$message->ItemId->Id,
+									"changekey"=>@$message->ItemId->ChangeKey,
+									"isread"=>@$message->IsRead,
+									"unixtime"=>$unixtime
+								);
+				if(count($output)<=0) {
+					$output[] = $newitem;
+				} else {
+					//iterate through and put them back in datetime order
+					$m = 0; $lastm = count($output)-1;
+					foreach($output as $thisitem) {
+						if($newitem["unixtime"] > $thisitem["unixtime"]) {
+							$insert = array($newitem);
+							$head = array_slice($output, 0, $m);
+							$tail = array_slice($output, $m);
+							$output = array_merge($head, $insert, $tail);
+							break;
+						} elseif($m==$lastm) {
+							$output[] = $newitem;
+						}
+						$m++;
+					}
+				}
+			}
+		}
+		for($o=0;$o<count($output);$o++) {
+			$output[$o]["uid"] = $offset+$o;
 		}
 		return $output;
 	}
@@ -186,11 +211,20 @@ class Exchangeclient {
 		
 		if($response->ResponseMessages->GetItemResponseMessage->ResponseCode == "NoError") {
 		
-			$message = $response->ResponseMessages->GetItemResponseMessage->Items->Message;
+			$items = $response->ResponseMessages->GetItemResponseMessage->Items;
+			foreach($items as $item) {
+				$message = $item;
+			}
 			$output = array(); 
 			$output["subject"] = $message->Subject;
-			$frommail = $message->From->Mailbox->EmailAddress;
-			$output["from"] = array("name"=>$message->From->Mailbox->Name, "address"=>$frommail);
+			if(isset($message->From)) {
+				$frommail = @$message->From->Mailbox->EmailAddress;
+				$fromname = @$message->From->Mailbox->Name;
+			} elseif(isset($message->Organizer)) {
+				$frommail = @$message->Organizer->Mailbox->EmailAddress;
+				$fromname = @$message->Organizer->Mailbox->Name;
+			}
+			$output["from"] = ["name"=>$fromname, "address"=>$frommail];
 			
 			//reorganise recipients
 			$to = $message->ToRecipients->Mailbox;
@@ -214,8 +248,14 @@ class Exchangeclient {
 			$output["recipients"]["cc"] = implode(", ", $ccrecipients);
 			
 			//date and time stamp
-			$timestmp = strtotime($message->DateTimeSent);
-			$output["date"] = date("j M H:i", $timestmp);
+			if(isset($message->DateTimeSent)) {
+				$timestmp = strtotime($message->DateTimeSent);
+				$output["date"] = date("j M H:i", $timestmp);
+			} elseif(isset($message->Start)) {
+				$starts = strtotime($message->Start);
+				$ends = strtotime($message->End);
+				$output["date"] = date("j M H:i", $starts) . " - " . date("j M H:i", $ends);
+			}
 			
 			//has the message been read yet
 			$output["isread"] = $message->IsRead;
@@ -263,6 +303,11 @@ class Exchangeclient {
 				return strlen($b) - strlen($a);
 			});
 			$output["links"] = $links;
+			
+			//create a body if this is a calendar item
+			if(isset($message->MeetingRequestType)) {
+				$output["bodytext"] = "You can manage this calendar item using the Outlook web app.";
+			}
 			
 			//attachments
 			$attachments = $this->get_attachment_list($itemid);
