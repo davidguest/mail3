@@ -215,6 +215,13 @@ class Exchangeclient {
 			foreach($items as $item) {
 				$message = $item;
 			}
+			if(isset($items->Message)) {
+				$itemtype = "email";
+			} elseif(isset($items->CalendarItem) || isset($items->MeetingMessage) || isset($items->MeetingRequest) || isset($items->MeetingResponse) || isset($items->MeetingCancellation)) {
+				$itemtype = "calendar";
+			} else {
+				$itemtype = "other";
+			}
 			$output = array(); 
 			$output["subject"] = $message->Subject;
 			if(isset($message->From)) {
@@ -223,14 +230,16 @@ class Exchangeclient {
 			} elseif(isset($message->Organizer)) {
 				$frommail = @$message->Organizer->Mailbox->EmailAddress;
 				$fromname = @$message->Organizer->Mailbox->Name;
+			} else {
+				$frommail = $fromname = "";
 			}
 			$output["from"] = ["name"=>$fromname, "address"=>$frommail];
 			
 			//reorganise recipients
 			$to = $message->ToRecipients->Mailbox;
-			$torecipients = array($frommail);
+			$torecipients = [$frommail];
 			$sentto = array();
-			if(!is_array($to)) { $to = array($to); }
+			if(!is_array($to)) { $to = [$to]; }
 			foreach($to as $toperson) {
 				$tomail = $toperson->EmailAddress;
 				$sentto[] = $tomail;
@@ -241,7 +250,7 @@ class Exchangeclient {
 			
 			$cc = $message->CcRecipients->Mailbox;
 			$ccrecipients = array();
-			if(!is_array($cc)) { $cc = array($cc); }
+			if(!is_array($cc)) { $cc = [$cc]; }
 			foreach($cc as $ccperson) {
 				$ccrecipients[] = $ccperson->EmailAddress;
 			}
@@ -255,9 +264,11 @@ class Exchangeclient {
 				$starts = strtotime($message->Start);
 				$ends = strtotime($message->End);
 				$output["date"] = date("j M H:i", $starts) . " - " . date("j M H:i", $ends);
+			} else {
+				$output["date"] = "";
 			}
 			
-			//has the message been read yet
+			//check if this item has been read
 			$output["isread"] = $message->IsRead;
 			
 			//message body
@@ -304,10 +315,10 @@ class Exchangeclient {
 			});
 			$output["links"] = $links;
 			
-			//create a body if this is a calendar item
-			if(isset($message->MeetingRequestType)) {
-				$output["bodytext"] = "You can manage this calendar item using the Outlook web app.";
-			}
+			//create a body if this is a calendar or task item
+			if($itemtype == "calendar" || $itemtype=="other") {
+				$output["bodytext"] = "You can manage this item using the Outlook web app.";
+			} 
 			
 			//attachments
 			$attachments = $this->get_attachment_list($itemid);
