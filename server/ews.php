@@ -233,13 +233,13 @@ class Exchangeclient {
 			} else {
 				$frommail = $fromname = "";
 			}
-			$output["from"] = ["name"=>$fromname, "address"=>$frommail];
+			$output["from"] = array("name"=>$fromname, "address"=>$frommail);
 			
 			//reorganise recipients
 			$to = $message->ToRecipients->Mailbox;
-			$torecipients = [$frommail];
+			$torecipients = array($frommail);
 			$sentto = array();
-			if(!is_array($to)) { $to = [$to]; }
+			if(!is_array($to)) { $to = array($to); }
 			foreach($to as $toperson) {
 				$tomail = $toperson->EmailAddress;
 				$sentto[] = $tomail;
@@ -250,7 +250,7 @@ class Exchangeclient {
 			
 			$cc = $message->CcRecipients->Mailbox;
 			$ccrecipients = array();
-			if(!is_array($cc)) { $cc = [$cc]; }
+			if(!is_array($cc)) { $cc = array($cc); }
 			foreach($cc as $ccperson) {
 				$ccrecipients[] = $ccperson->EmailAddress;
 			}
