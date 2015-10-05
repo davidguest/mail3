@@ -188,7 +188,7 @@ if(isset($_REQUEST["token"]) || (isset($_REQUEST["username"]) && isset($_REQUEST
 			$attachid = str_replace(" ", "+", urldecode($_REQUEST["id"]));
 			$attachment = @$mail->get_attachment($attachid);
 			
-			header('Content-Disposition: attachment; filename="' . $filename . '"');
+			header('Content-Disposition: attachment; filename="' . $attachment->Name . '"');
 			header('Content-Type: ' . $attachment->ContentType);
 			echo @$mail->get_raw_attachment($attachid);
 		
