@@ -355,7 +355,7 @@
           var attachments = msg.attachments;
           for(var a in attachments) {
               var attachment = attachments[a];
-              var href = linkAttachment(msg.uid, attachment.seq);
+              var href = linkAttachment(attachment.id);
               //if(platform != "android") {
                 msgHTML += '<p><span class="attachmentbullet">&#10033;</span> <a href="'+href+'">'+attachment.filename+'</a></p>';
               //} else {
@@ -506,9 +506,9 @@
       
     }
   
-    function linkAttachment(uid, seq) {
+    function linkAttachment(id) {
         //campusm://openURL?url=XX&type=external
-  	var fileloc = url + '?action=download&token=' + token + '&uid=' + uid + '&seq=' + seq;
+  	var fileloc = url + '?action=download&token=' + token + '&id=' + encodeURIComponent(id);
   	return fileloc;
   
     }
