@@ -154,33 +154,45 @@ if(isset($_REQUEST["token"]) || (isset($_REQUEST["username"]) && isset($_REQUEST
 		
 		}
 	} elseif($action=="download") {
-		$uid = intval($_REQUEST["uid"]);
-		$seq = intval($_REQUEST["seq"]);
 		
-		$item = @$mail->list_inbox($uid, 1);
-		$itemid = $item[0]["id"]; 
-		$filelist = @$mail->get_attachment_list($itemid);
-		if(isset($filelist[$seq])) {
+		if(isset($_REQUEST["uid"]) && isset($_REQUEST["seq"])) {
+		
+			$uid = intval($_REQUEST["uid"]);
+			$seq = intval($_REQUEST["seq"]);
+			$item = @$mail->list_inbox($uid, 1);
+			$itemid = $item[0]["id"]; 
 			
-			$filedetails = $filelist[$seq];
-			$filename = $filedetails["filename"];
-			$size = $filedetails["size"];
-			$attachid = $filedetails["id"];
+			$filelist = @$mail->get_attachment_list($itemid);
+			if(isset($filelist[$seq])) {
 			
+				$filedetails = $filelist[$seq];
+				$filename = $filedetails["filename"];
+				$size = $filedetails["size"];
+				$attachid = $filedetails["id"];
+			
+				$attachment = @$mail->get_attachment($attachid);
+			
+				header('Content-Disposition: attachment; filename="' . $filename . '"');
+				header('Content-Type: ' . $attachment->ContentType);
+				echo @$mail->get_raw_attachment($attachid);
+		
+			} else {
+		
+				header('Content-Type: text/plain; charset=UTF-8');
+				echo json_encode(array("error"=>"Could not locate an attachment for those details"));
+		
+			} 
+			
+		} elseif(isset($_REQUEST["id"])) {
+
+			$attachid = str_replace(" ", "+", urldecode($_REQUEST["id"]));
 			$attachment = @$mail->get_attachment($attachid);
-			
 			
 			header('Content-Disposition: attachment; filename="' . $filename . '"');
 			header('Content-Type: ' . $attachment->ContentType);
-			//header('Content-Length: ' . $size);
 			echo @$mail->get_raw_attachment($attachid);
 		
-		} else {
-		
-			header('Content-Type: text/plain; charset=UTF-8');
-			echo json_encode(array("error"=>"Could not locate an attachment for those details"));
-		
-		} 
+		}
 			
 		
 		
